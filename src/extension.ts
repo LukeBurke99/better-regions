@@ -69,23 +69,33 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       try {
-        if (typeof targetLine === "number" && targetLine > 0) {
-          const ranges = (await vscode.commands.executeCommand(
-            "vscode.executeFoldingRangeProvider",
-            active.document.uri
-          )) as
-            | Array<{ start: number; end: number; kind?: string }>
-            | undefined;
-          const lines = linesToFoldExcludingTarget(ranges ?? [], targetLine);
-          if (lines.length > 0) {
-            await vscode.commands.executeCommand("editor.fold", {
-              selectionLines: lines,
-            });
-          }
-          // If no ranges, skip folding to keep target visible
-        } else {
-          await vscode.commands.executeCommand("editor.foldAllMarkerRegions");
+        // Determine the effective target line from selection if not provided
+        const line =
+          typeof targetLine === "number"
+            ? targetLine
+            : active.selection?.active?.line;
+        // Ask for folding ranges and decide if caret is inside any region
+        const ranges = (await vscode.commands.executeCommand(
+          "vscode.executeFoldingRangeProvider",
+          active.document.uri
+        )) as Array<{ start: number; end: number; kind?: string }> | undefined;
+
+        if (!ranges || typeof line !== "number") {
+          // Can't reliably determine; to avoid collapsing a target region, do nothing.
+          return;
         }
+
+        const inRegion = (ranges ?? [])
+          .filter((r) => !r.kind || r.kind.toLowerCase().includes("region"))
+          .some((r) => line >= r.start && line <= r.end);
+
+        if (inRegion) {
+          // Caret within a region: don't fold anything
+          return;
+        }
+
+        // Not inside a region: fold all marker regions
+        await vscode.commands.executeCommand("editor.foldAllMarkerRegions");
       } catch (err) {
         console.debug("better-regions: folding skipped due to error", err);
       } finally {
