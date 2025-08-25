@@ -46,31 +46,73 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    // Detect if the user navigated to a specific line (e.g., from search/go to)
-    const targetLine = editor.selections?.[0]?.active?.line ?? 0;
+    // Defer folding a bit to allow Search/Go To to set the selection.
+    let finished = false;
+    const uriKey = doc.uri.toString();
 
-    try {
-      if (targetLine > 0) {
-        // Try to fold all other marker regions, keep the one containing target visible
-        const ranges = (await vscode.commands.executeCommand(
-          "vscode.executeFoldingRangeProvider",
-          doc.uri
-        )) as Array<{ start: number; end: number; kind?: string }> | undefined;
-        const lines = linesToFoldExcludingTarget(ranges ?? [], targetLine);
-        if (lines.length > 0) {
-          await vscode.commands.executeCommand("editor.fold", {
-            selectionLines: lines,
-          });
-        }
-        // If no ranges or API not available, skip folding per requirement
+    const cleanup = (listener?: vscode.Disposable, timer?: NodeJS.Timeout) => {
+      if (listener) {
+        listener.dispose();
+      }
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+
+    const doFold = async (targetLine: number | undefined) => {
+      if (finished) {
         return;
       }
-      // Default: fold all marker regions
-      await vscode.commands.executeCommand("editor.foldAllMarkerRegions");
-    } catch (err) {
-      // Be conservative: don't disrupt user if folding fails
-      console.debug("better-regions: folding skipped due to error", err);
-    }
+      const active = vscode.window.activeTextEditor;
+      if (!active || active.document.uri.toString() !== uriKey) {
+        finished = true;
+        return;
+      }
+      try {
+        if (typeof targetLine === "number" && targetLine > 0) {
+          const ranges = (await vscode.commands.executeCommand(
+            "vscode.executeFoldingRangeProvider",
+            active.document.uri
+          )) as
+            | Array<{ start: number; end: number; kind?: string }>
+            | undefined;
+          const lines = linesToFoldExcludingTarget(ranges ?? [], targetLine);
+          if (lines.length > 0) {
+            await vscode.commands.executeCommand("editor.fold", {
+              selectionLines: lines,
+            });
+          }
+          // If no ranges, skip folding to keep target visible
+        } else {
+          await vscode.commands.executeCommand("editor.foldAllMarkerRegions");
+        }
+      } catch (err) {
+        console.debug("better-regions: folding skipped due to error", err);
+      } finally {
+        finished = true;
+      }
+    };
+
+    // One-shot selection listener for the active editor
+    const selectionListener = vscode.window.onDidChangeTextEditorSelection(
+      (e) => {
+        if (finished) {
+          return;
+        }
+        if (e.textEditor.document.uri.toString() !== uriKey) {
+          return;
+        }
+        const line = e.selections?.[0]?.active?.line ?? 0;
+        cleanup(selectionListener, timeout);
+        void doFold(line);
+      }
+    );
+
+    // Fallback if no selection change happens shortly
+    const timeout = setTimeout(() => {
+      cleanup(selectionListener, timeout);
+      void doFold(undefined);
+    }, 450);
   }
 
   // Initial active editor

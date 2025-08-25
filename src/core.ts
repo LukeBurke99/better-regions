@@ -54,7 +54,7 @@ export function linesToFoldExcludingTarget(
     return [];
   }
   const isRegion = (r: FoldingRangeLite) =>
-    !r.kind || r.kind.toLowerCase().includes("region");
+    !r.kind || r.kind.toString().toLowerCase().includes("region");
   const regionRanges = ranges.filter(isRegion);
   if (targetLine === undefined || targetLine === 0) {
     return regionRanges.map((r) => r.start);
