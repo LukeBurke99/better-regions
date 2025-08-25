@@ -68,6 +68,17 @@ export function activate(context: vscode.ExtensionContext) {
         finished = true;
         return;
       }
+      const isRegionKind = (k: unknown): boolean => {
+        if (typeof k === "string") {
+          return k.toLowerCase().includes("region");
+        }
+        if (typeof k === "number") {
+          // vscode.FoldingRangeKind
+          // heuristic: 3=region, 2=imports, 1=comment
+          return k === 3;
+        }
+        return false;
+      };
       try {
         // Determine the effective target line from selection if not provided
         const line =
@@ -78,7 +89,7 @@ export function activate(context: vscode.ExtensionContext) {
         const ranges = (await vscode.commands.executeCommand(
           "vscode.executeFoldingRangeProvider",
           active.document.uri
-        )) as Array<{ start: number; end: number; kind?: string }> | undefined;
+        )) as vscode.FoldingRange[] | undefined;
 
         if (!ranges || typeof line !== "number") {
           // Can't reliably determine; to avoid collapsing a target region, do nothing.
@@ -86,7 +97,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const inRegion = (ranges ?? [])
-          .filter((r) => !r.kind || r.kind.toLowerCase().includes("region"))
+          .filter((r) => isRegionKind(r.kind))
           .some((r) => line >= r.start && line <= r.end);
 
         if (inRegion) {
