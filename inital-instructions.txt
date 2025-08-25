@@ -1,0 +1,29 @@
+This project is a vs code extension. it uses pnpm and typescript. At the minute, it is empty and contains the default code since installing it using the vs code extension generator package. I want you to implement the following for this extension:
+
+Goal
+---
+have more controll over #region blocks for multiple languages. The main goal is to be able to automatically collapse (or fold as it is known to vs code) all region blocks when a new file is opened.
+
+Settings
+---
+- Enable For All Files (boolean): This will determine if the extension will run when opening ANY file (that is not in the exclude list - more on this later)
+- Enabled Files (string[]): The file types that this extension will run for when that particular file type opens. This setting is to be used when the 'Enable For All Files' setting is disabled.
+- Disabled Files (string[]): The file types that this extension will NOT run for when that file type is opened. This setting is to be used when the 'Enable For All Files' setting is enabled.
+
+Logic
+---
+When a new file is opened, the extension should check if it should be "folded" based on the user settings. if the file should fold, then the command to Fold all regions should be executed in that file. Tis extension needs to make sure that it only checks to see if the regions should be folded if that file has been closed. For example, if a file is opened and then folds the regions, if another file is opened (on top of that file) but the file stays open, the next time the user opens that file it should not touch the regions because the file was still open in another tab. it should only fold when the file has been closed. Here are more examples:
+
+1. I open a file -> it folds region blocks -> I open a region that I want to look in -> I open another file -> I go back to that file that was auto folded and I opened a region block -> The region blocks are not effected and the one I opened stays open because the extension does not run the logic to shut the regions.
+
+2. I open a file (file 1) -> the regions fold -> I open a region -> I open another file (file 2) -> I close file 1 -> I then open file 1 again -> all of the regions fold like the first time it was opened.
+
+I would also like some unit tests created for this project if possible and a few different scenarios implemented
+
+Important Notes:
+If the user is navigating to a file via 'Find' or 'Go To Source' (or something similar to those where they are aiming to go to a certain line), if the line that the user is attempting to go to is within a region block, it should not fold that region. (if possible, it would be good to folder the other regions and NOT the one that the user is going to be looking inm, however, if this is not possible then just don't fold any region)
+
+
+
+
+I also want a README.MD to be created with a description of what the extension offers, as well as an explainaition of ALL of the settings being introduced, as well as some examples if any settings are complicated enough.
