@@ -1,163 +1,160 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import * as vscode from "vscode";
+import * as vscode from 'vscode';
 import {
-  linesToFoldExcludingTarget,
-  OpenDocumentTracker,
-  shouldFoldForLanguage,
-  type Settings,
-} from "./core";
+	linesToFoldExcludingTarget,
+	OpenDocumentTracker,
+	shouldFoldForLanguage,
+	type Settings
+} from './core';
 
 function getSettings(): Settings {
-  const cfg = vscode.workspace.getConfiguration("betterRegions");
-  return {
-    enableForAllFiles: cfg.get<boolean>("enableForAllFiles", true),
-    enabledFiles: cfg.get<string[]>("enabledFiles", []),
-    disabledFiles: cfg.get<string[]>("disabledFiles", []),
-  };
+	const cfg = vscode.workspace.getConfiguration('betterRegions');
+	return {
+		enableForAllFiles: cfg.get<boolean>('enableForAllFiles', true),
+		enabledFiles: cfg.get<string[]>('enabledFiles', []),
+		disabledFiles: cfg.get<string[]>('disabledFiles', [])
+	};
 }
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  // Track which documents are currently open so we only auto-fold on first open
-  const existingDocs = vscode.workspace.textDocuments.map((d) =>
-    d.uri.toString()
-  );
-  const tracker = new OpenDocumentTracker(existingDocs);
+	// Track which documents are currently open so we only auto-fold on first open
+	const existingDocs = vscode.workspace.textDocuments.map((d) => d.uri.toString());
+	const tracker = new OpenDocumentTracker(existingDocs);
 
-  async function maybeAutoFold(editor: vscode.TextEditor | undefined) {
-    if (!editor) {
-      return;
-    }
-    const doc = editor.document;
-    // Skip non-file backed docs except untitled
-    if (doc.isUntitled === false && doc.uri.scheme !== "file") {
-      return;
-    }
-    // Only run on first time a doc becomes active after being closed
-    const isNewlyOpened = tracker.markOpened(doc.uri);
-    if (!isNewlyOpened) {
-      return;
-    }
+	async function maybeAutoFold(editor: vscode.TextEditor | undefined) {
+		if (!editor) {
+			return;
+		}
+		const doc = editor.document;
+		// Skip non-file backed docs except untitled
+		if (doc.isUntitled === false && doc.uri.scheme !== 'file') {
+			return;
+		}
+		// Only run on first time a doc becomes active after being closed
+		const isNewlyOpened = tracker.markOpened(doc.uri);
+		if (!isNewlyOpened) {
+			return;
+		}
 
-    const settings = getSettings();
-    if (!shouldFoldForLanguage(settings, doc.languageId)) {
-      return;
-    }
+		const settings = getSettings();
+		if (!shouldFoldForLanguage(settings, doc.languageId)) {
+			return;
+		}
 
-    // Defer folding a bit to allow Search/Go To to set the selection.
-    let finished = false;
-    const uriKey = doc.uri.toString();
+		// Defer folding a bit to allow Search/Go To to set the selection.
+		let finished = false;
+		const uriKey = doc.uri.toString();
 
-    const cleanup = (listener?: vscode.Disposable, timer?: NodeJS.Timeout) => {
-      if (listener) {
-        listener.dispose();
-      }
-      if (timer) {
-        clearTimeout(timer);
-      }
-    };
+		const cleanup = (listener?: vscode.Disposable, timer?: NodeJS.Timeout) => {
+			if (listener) {
+				listener.dispose();
+			}
+			if (timer) {
+				clearTimeout(timer);
+			}
+		};
 
-    const doFold = async (targetLine: number | undefined) => {
-      if (finished) {
-        return;
-      }
-      const active = vscode.window.activeTextEditor;
-      if (!active || active.document.uri.toString() !== uriKey) {
-        finished = true;
-        return;
-      }
-      const isRegionKind = (k: unknown): boolean => {
-        if (typeof k === "string") {
-          return k.toLowerCase().includes("region");
-        }
-        if (typeof k === "number") {
-          // vscode.FoldingRangeKind
-          // heuristic: 3=region, 2=imports, 1=comment
-          return k === 3;
-        }
-        return false;
-      };
-      try {
-        // Determine the effective target line from selection if not provided
-        const line =
-          typeof targetLine === "number"
-            ? targetLine
-            : active.selection?.active?.line;
-        // Ask for folding ranges and decide if caret is inside any region
-        const ranges = (await vscode.commands.executeCommand(
-          "vscode.executeFoldingRangeProvider",
-          active.document.uri
-        )) as vscode.FoldingRange[] | undefined;
+		const doFold = async (targetLine: number | undefined) => {
+			if (finished) {
+				return;
+			}
+			const active = vscode.window.activeTextEditor;
+			if (!active || active.document.uri.toString() !== uriKey) {
+				finished = true;
+				return;
+			}
+			try {
+				// Determine the effective target line from selection if not provided
+				const line =
+					typeof targetLine === 'number' ? targetLine : active.selection?.active?.line;
+				// Ask for folding ranges and decide if caret is inside any region
+				const ranges = (await vscode.commands.executeCommand(
+					'vscode.executeFoldingRangeProvider',
+					active.document.uri
+				)) as vscode.FoldingRange[] | undefined;
 
-        if (!ranges || typeof line !== "number") {
-          // Can't reliably determine; to avoid collapsing a target region, do nothing.
-          return;
-        }
+				if (!ranges) {
+					// No ranges available, default to fold all marker regions
+					await vscode.commands.executeCommand('editor.foldAllMarkerRegions');
+					return;
+				}
 
-        const inRegion = (ranges ?? [])
-          .filter((r) => isRegionKind(r.kind))
-          .some((r) => line >= r.start && line <= r.end);
+				const regionRanges = ranges.filter(
+					(r) => r.kind === vscode.FoldingRangeKind.Region
+				);
 
-        if (inRegion) {
-          // Caret within a region: don't fold anything
-          return;
-        }
+				if (typeof line !== 'number') {
+					// No reliable caret line; fold all marker regions
+					await vscode.commands.executeCommand('editor.foldAllMarkerRegions');
+					return;
+				}
 
-        // Not inside a region: fold all marker regions
-        await vscode.commands.executeCommand("editor.foldAllMarkerRegions");
-      } catch (err) {
-        console.debug("better-regions: folding skipped due to error", err);
-      } finally {
-        finished = true;
-      }
-    };
+				const inRegion = regionRanges.some((r) => line >= r.start && line <= r.end);
 
-    // One-shot selection listener for the active editor
-    const selectionListener = vscode.window.onDidChangeTextEditorSelection(
-      (e) => {
-        if (finished) {
-          return;
-        }
-        if (e.textEditor.document.uri.toString() !== uriKey) {
-          return;
-        }
-        const line = e.selections?.[0]?.active?.line ?? 0;
-        cleanup(selectionListener, timeout);
-        void doFold(line);
-      }
-    );
+				if (inRegion) {
+					// Fold other regions, keep the one containing the caret open
+					const lines = regionRanges
+						.filter((r) => !(line >= r.start && line <= r.end))
+						.map((r) => r.start + 1);
+					for (let i = 0; i < lines.length; i++) {
+						await vscode.commands.executeCommand('editor.unfold', {
+							selectionLines: [lines[i]]
+						});
+						await vscode.commands.executeCommand('editor.fold', {
+							selectionLines: [lines[i]]
+						});
+					}
+					return;
+				}
 
-    // Fallback if no selection change happens shortly
-    const timeout = setTimeout(() => {
-      cleanup(selectionListener, timeout);
-      void doFold(undefined);
-    }, 450);
-  }
+				// Not inside a region: fold all marker regions
+				await vscode.commands.executeCommand('editor.foldAllMarkerRegions');
+			} catch (err) {
+				console.debug('better-regions: folding skipped due to error', err);
+			} finally {
+				finished = true;
+			}
+		};
 
-  // Initial active editor
-  void maybeAutoFold(vscode.window.activeTextEditor);
+		// One-shot selection listener for the active editor
+		const selectionListener = vscode.window.onDidChangeTextEditorSelection((e) => {
+			if (finished) {
+				return;
+			}
+			if (e.textEditor.document.uri.toString() !== uriKey) {
+				return;
+			}
+			const line = e.selections?.[0]?.active?.line ?? 0;
+			cleanup(selectionListener, timeout);
+			void doFold(line);
+		});
 
-  // When the active editor changes, check if we should fold
-  context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor((e) => void maybeAutoFold(e))
-  );
+		// Fallback if no selection change happens shortly
+		const timeout = setTimeout(() => {
+			cleanup(selectionListener, timeout);
+			void doFold(undefined);
+		}, 450);
+	}
 
-  // When a document is fully closed, allow folding again next time it's opened
-  context.subscriptions.push(
-    vscode.workspace.onDidCloseTextDocument((doc) =>
-      tracker.markClosed(doc.uri)
-    )
-  );
+	// Initial active editor
+	void maybeAutoFold(vscode.window.activeTextEditor);
+
+	// When the active editor changes, check if we should fold
+	context.subscriptions.push(
+		vscode.window.onDidChangeActiveTextEditor((e) => void maybeAutoFold(e))
+	);
+
+	// When a document is fully closed, allow folding again next time it's opened
+	context.subscriptions.push(
+		vscode.workspace.onDidCloseTextDocument((doc) => tracker.markClosed(doc.uri))
+	);
 }
 
 // Exports for unit testing
-export {
-  linesToFoldExcludingTarget,
-  OpenDocumentTracker,
-  shouldFoldForLanguage,
-};
+export { linesToFoldExcludingTarget, OpenDocumentTracker, shouldFoldForLanguage };
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
