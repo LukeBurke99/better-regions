@@ -2,58 +2,61 @@
 
 This is the README for your extension "better-regions". After writing up a brief description, we recommend including the following sections.
 
-## Features
+# Better Regions
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+More control over region blocks across multiple languages. Automatically folds marker regions like `#region`/`#endregion` (or their language equivalents) when a file is opened, with sensible exceptions.
 
-For example if there is an image subfolder under your extension project workspace:
+## What it does
 
-\!\[feature X\]\(images/feature-x.png\)
+- On first open of a file, folds all marker regions in that editor.
+- If you navigate to a specific line (e.g. via Find, Go to Definition, Go to Line), the extension avoids folding the region that contains your target line. If it can detect all region ranges, it folds the other regions and leaves your target region expanded. If it cannot detect ranges, it skips folding entirely for that navigation.
+- Remembers which files are currently open. If a file remains open in another tab, switching back will not refold it. Only once that document is fully closed and re-opened will auto-folding run again.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+### Examples
+1. Open a file -> regions fold -> expand a region to inspect it -> switch to another file -> switch back -> your expanded region remains open. The extension does not re-fold because the document was never closed.
+2. Open file A -> regions fold -> expand a region -> open file B -> close file A -> re-open file A -> regions fold again (fresh open).
+3. Use “Go to Definition” to jump into a symbol located inside a region -> that containing region stays open; other regions get folded when possible.
 
-## Requirements
+## Settings
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+All settings live under the `betterRegions` namespace.
 
-## Extension Settings
+- betterRegions.enableForAllFiles (boolean, default: true)
+	- Run Better Regions for all files, except those listed in `disabledFiles`.
+- betterRegions.enabledFiles (string[])
+	- Language IDs to enable when `enableForAllFiles` is false. Example: ["typescript", "javascript", "python"].
+- betterRegions.disabledFiles (string[])
+	- Language IDs to exclude when `enableForAllFiles` is true. Example: ["markdown", "plaintext"].
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+Notes:
+- Language ID is the VS Code language identifier (e.g. `typescript`, `javascript`, `csharp`, `python`, `cpp`, `java`, `markdown`).
+- `enableForAllFiles: true` + `disabledFiles: ["markdown"]` means fold everywhere except Markdown.
+- `enableForAllFiles: false` + `enabledFiles: ["typescript"]` means only fold in TypeScript files.
 
-For example:
+## How it works (high level)
 
-This extension contributes the following settings:
+- The extension listens when an editor becomes active and when documents close.
+- It tracks which URIs are currently open; auto-folding only runs the first time a document appears after being closed.
+- Folding is performed using built-in commands:
+	- `editor.foldAllMarkerRegions` for the default behavior.
+	- For targeted navigation, it queries folding ranges via `vscode.executeFoldingRangeProvider` and folds all marker regions except the one containing the caret.
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+## Development
 
-## Known Issues
+- Build: pnpm run compile
+- Watch: pnpm run watch
+- Test: pnpm test
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+This project uses TypeScript and VS Code test runner.
 
-## Release Notes
+## Troubleshooting
 
-Users appreciate release notes as you update your extension.
+- Nothing folds when opening a file:
+	- Ensure the language ID isn’t excluded by your settings.
+	- For special navigation into a line, the extension may skip folding to keep your target visible.
+- Regions don’t fold for a particular language:
+	- Some languages may not provide folding ranges for marker regions. The extension relies on VS Code’s folding support.
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
 
 ## Working with Markdown
 

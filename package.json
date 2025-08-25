@@ -9,7 +9,18 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:json",
+    "onLanguage:python",
+    "onLanguage:csharp",
+    "onLanguage:cpp",
+    "onLanguage:java",
+    "onLanguage:markdown",
+    "*"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -17,7 +28,35 @@
         "command": "better-regions.helloWorld",
         "title": "Hello World"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Better Regions",
+      "properties": {
+        "betterRegions.enableForAllFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run Better Regions for all files, except those in 'Disabled Files'."
+        },
+        "betterRegions.enabledFiles": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "markdownDescription": "List of language IDs to enable when 'Enable For All Files' is false. Example: ['typescript','javascript','python'].",
+          "scope": "window"
+        },
+        "betterRegions.disabledFiles": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "markdownDescription": "List of language IDs to exclude when 'Enable For All Files' is true. Example: ['markdown','plaintext'].",
+          "scope": "window"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile",
@@ -25,7 +64,8 @@
     "watch": "tsc -watch -p ./",
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "mocha \"out/test/**/*.test.js\"",
+    "test:e2e": "vscode-test"
   },
   "devDependencies": {
     "@types/vscode": "^1.103.0",
@@ -36,6 +76,7 @@
     "eslint": "^9.32.0",
     "typescript": "^5.9.2",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "mocha": "^10.7.3"
   }
 }

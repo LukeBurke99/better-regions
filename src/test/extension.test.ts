@@ -1,15 +1,68 @@
-import * as assert from 'assert';
+import * as assert from "assert";
+import {
+  linesToFoldExcludingTarget,
+  OpenDocumentTracker,
+  shouldFoldForLanguage,
+} from "../core";
 
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
-import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+describe("Better Regions - Unit Tests", () => {
+  it("OpenDocumentTracker opens/closes correctly", () => {
+    const tracker = new OpenDocumentTracker();
+    const a = { toString: () => "file:///test/a.ts" } as any;
+    const b = { toString: () => "file:///test/b.ts" } as any;
 
-suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+    // First open returns true
+    assert.strictEqual(tracker.markOpened(a), true);
+    // Second open is false
+    assert.strictEqual(tracker.markOpened(a), false);
+    // Close then open again -> true
+    tracker.markClosed(a);
+    assert.strictEqual(tracker.markOpened(a), true);
+    // Separate document unaffected
+    assert.strictEqual(tracker.markOpened(b), true);
+    assert.strictEqual(tracker.isOpen(b), true);
+  });
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
-	});
+  it("shouldFoldForLanguage respects enableForAllFiles + disabledFiles", () => {
+    const settingsAll = {
+      enableForAllFiles: true,
+      enabledFiles: [],
+      disabledFiles: ["markdown"],
+    };
+    assert.strictEqual(
+      shouldFoldForLanguage(settingsAll as any, "typescript"),
+      true
+    );
+    assert.strictEqual(
+      shouldFoldForLanguage(settingsAll as any, "markdown"),
+      false
+    );
+  });
+
+  it("shouldFoldForLanguage respects enabledFiles when not all", () => {
+    const settingsSome = {
+      enableForAllFiles: false,
+      enabledFiles: ["typescript", "javascript"],
+      disabledFiles: [],
+    };
+    assert.strictEqual(
+      shouldFoldForLanguage(settingsSome as any, "typescript"),
+      true
+    );
+    assert.strictEqual(
+      shouldFoldForLanguage(settingsSome as any, "python"),
+      false
+    );
+  });
+
+  it("linesToFoldExcludingTarget excludes the target region", () => {
+    const ranges = [
+      { start: 0, end: 10, kind: "region" },
+      { start: 12, end: 20, kind: "region" },
+      { start: 22, end: 30, kind: "imports" }, // non-region should be ignored
+    ];
+    // target inside first region -> should only fold second region start
+    const lines = linesToFoldExcludingTarget(ranges as any, 5);
+    assert.deepStrictEqual(lines, [12]);
+  });
 });
