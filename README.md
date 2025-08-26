@@ -1,5 +1,7 @@
 # Better Regions
 
+![Logo](images/logo/128.png)
+
 More control over region blocks across multiple languages. Automatically folds marker regions like `#region`/`#endregion` (or their language equivalents) when a file is opened, with sensible exceptions.
 
 ## What it does

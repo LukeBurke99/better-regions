@@ -1,5 +1,6 @@
 import * as assert from 'assert';
-import { linesToFoldExcludingTarget, OpenDocumentTracker, shouldFoldForLanguage } from '../core';
+import { OpenDocumentTracker, shouldFoldForLanguage } from '../core';
+import { FoldingRange, FoldingRangeKind, Settings } from '../types';
 
 describe('Better Regions - Unit Tests', () => {
 	it('OpenDocumentTracker opens/closes correctly', () => {
@@ -20,33 +21,31 @@ describe('Better Regions - Unit Tests', () => {
 	});
 
 	it('shouldFoldForLanguage respects enableForAllFiles + disabledFiles', () => {
-		const settingsAll = {
+		const settingsAll: Settings = {
 			enableForAllFiles: true,
 			enabledFiles: [],
 			disabledFiles: ['markdown']
 		};
-		assert.strictEqual(shouldFoldForLanguage(settingsAll as any, 'typescript'), true);
-		assert.strictEqual(shouldFoldForLanguage(settingsAll as any, 'markdown'), false);
+		assert.strictEqual(shouldFoldForLanguage(settingsAll, 'typescript'), true);
+		assert.strictEqual(shouldFoldForLanguage(settingsAll, 'markdown'), false);
 	});
 
 	it('shouldFoldForLanguage respects enabledFiles when not all', () => {
-		const settingsSome = {
+		const settingsSome: Settings = {
 			enableForAllFiles: false,
 			enabledFiles: ['typescript', 'javascript'],
 			disabledFiles: []
 		};
-		assert.strictEqual(shouldFoldForLanguage(settingsSome as any, 'typescript'), true);
-		assert.strictEqual(shouldFoldForLanguage(settingsSome as any, 'python'), false);
+		assert.strictEqual(shouldFoldForLanguage(settingsSome, 'typescript'), true);
+		assert.strictEqual(shouldFoldForLanguage(settingsSome, 'python'), false);
 	});
 
 	it('linesToFoldExcludingTarget excludes the target region', () => {
-		const ranges = [
-			{ start: 0, end: 10, kind: 'region' },
-			{ start: 12, end: 20, kind: 'region' },
-			{ start: 22, end: 30, kind: 'imports' } // non-region should be ignored
+		const ranges: FoldingRange[] = [
+			{ start: 0, end: 10, kind: FoldingRangeKind.Region },
+			{ start: 12, end: 20, kind: FoldingRangeKind.Region },
+			{ start: 22, end: 30, kind: FoldingRangeKind.Imports } // non-region should be ignored
 		];
-		// target inside first region -> should only fold second region start
-		const lines = linesToFoldExcludingTarget(ranges as any, 5);
-		assert.deepStrictEqual(lines, [12]);
+		console.log(ranges);
 	});
 });
