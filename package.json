@@ -3,28 +3,45 @@
 	"publisher": "burke-development",
 	"displayName": "Better Regions",
 	"description": "More control over region blocks",
+	"version": "0.0.1",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/LukeBurke99/better-regions"
 	},
-	"version": "0.0.1",
+	"categories": [
+		"Formatters",
+		"Other"
+	],
+	"keywords": [
+		"folding",
+		"fold",
+		"collapsing",
+		"collapse",
+		"hide",
+		"blocks",
+		"markers",
+		"bracket",
+		"brackets",
+		"vscode",
+		"auto",
+		"close"
+	],
+	"license": "SEE LICENSE IN LICENSE",
 	"engines": {
 		"vscode": "^1.103.0"
 	},
-	"categories": [
-		"Other"
-	],
 	"activationEvents": [
 		"onStartupFinished",
 		"onLanguage:javascript",
 		"onLanguage:typescript",
-		"onLanguage:json",
+		"onLanguage:typescriptreact",
+		"onLanguage:svelte",
+		"onLanguage:html",
+		"onLanguage:css",
 		"onLanguage:python",
 		"onLanguage:csharp",
 		"onLanguage:cpp",
-		"onLanguage:java",
-		"onLanguage:markdown",
-		"*"
+		"onLanguage:java"
 	],
 	"main": "./out/extension.js",
 	"contributes": {

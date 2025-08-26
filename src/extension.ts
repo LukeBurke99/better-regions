@@ -62,35 +62,28 @@ export function activate(context: vscode.ExtensionContext): void {
 				const line =
 					typeof targetLine === 'number' ? targetLine : active.selection.active.line;
 				// Ask for folding ranges and decide if caret is inside any region
-				const ranges: vscode.FoldingRange[] | undefined =
-					await vscode.commands.executeCommand(
-						'vscode.executeFoldingRangeProvider',
-						active.document.uri
-					);
-
-				if (!ranges) {
-					// No ranges available, default to fold all marker regions
-					await vscode.commands.executeCommand('editor.foldAllMarkerRegions');
-					return;
-				}
-
-				const regionRanges = ranges.filter(
-					(r) => r.kind === vscode.FoldingRangeKind.Region
+				let ranges: vscode.FoldingRange[] = await vscode.commands.executeCommand(
+					'vscode.executeFoldingRangeProvider',
+					active.document.uri
 				);
+				ranges = ranges.filter((r) => r.kind === vscode.FoldingRangeKind.Region);
 
-				if (typeof line !== 'number') {
-					// No reliable caret line; fold all marker regions
+				// There are no regions that need to be folded so we do nothing
+				if (ranges.length === 0) return;
+
+				// Check if the line number is not valid or is less than or equal to 0. Fold all marker regions if so
+				if (typeof line !== 'number' || line <= 0) {
 					await vscode.commands.executeCommand('editor.foldAllMarkerRegions');
 					return;
 				}
 
-				const inRegion = regionRanges.some((r) => line >= r.start && line <= r.end);
-
-				if (inRegion) {
+				// Check if the current line is within a region.
+				if (ranges.some((r) => line >= r.start && line <= r.end)) {
 					// Fold other regions, keep the one containing the caret open
-					const lines = regionRanges
+					const lines = ranges
 						.filter((r) => !(line >= r.start && line <= r.end))
 						.map((r) => r.start + 1);
+
 					// eslint-disable-next-line @typescript-eslint/prefer-for-of
 					for (let i = 0; i < lines.length; i++) {
 						await vscode.commands.executeCommand('editor.unfold', {
