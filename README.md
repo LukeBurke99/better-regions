@@ -4,6 +4,8 @@
 
 More control over region blocks across multiple languages. Automatically folds marker regions like `#region`/`#endregion` (or their language equivalents) when a file is opened, with sensible exceptions.
 
+![Before and After](images/BeforeAndAfter.png)
+
 ## What it does
 
 - On first open of a file, folds all marker regions in that editor.

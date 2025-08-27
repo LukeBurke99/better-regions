@@ -3,7 +3,7 @@
 	"publisher": "burke-development",
 	"displayName": "Better Regions",
 	"description": "More control over region blocks",
-	"version": "0.0.1",
+	"version": "1.0.0",
 	"icon": "images/logo/512.png",
 	"galleryBanner": {
 		"theme": "dark",
