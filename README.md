@@ -6,6 +6,8 @@ More control over region blocks across multiple languages. Automatically folds m
 
 ![Before and After](images/BeforeAndAfter.png)
 
+[Changelog](CHANGELOG.md)
+
 ## What it does
 
 - On first open of a file, folds all marker regions in that editor.
