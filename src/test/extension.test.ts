@@ -1,6 +1,6 @@
 import * as assert from 'assert';
-import { OpenDocumentTracker, shouldFoldForLanguage } from '../core';
-import { FoldingRange, FoldingRangeKind, Settings } from '../types';
+import { OpenDocumentTracker, shouldFoldForLanguage } from '../core.js';
+import { FoldingRange, FoldingRangeKind, Settings } from '../types.js';
 
 describe('Better Regions - Unit Tests', () => {
 	it('OpenDocumentTracker opens/closes correctly', () => {

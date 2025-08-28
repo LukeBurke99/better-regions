@@ -1,6 +1,6 @@
 // Core utilities that do not import 'vscode' so they can be unit tested with mocha
 
-import { Settings } from './types';
+import { Settings } from './types.js';
 
 export class OpenDocumentTracker {
 	private open: Set<string> = new Set<string>();
@@ -33,19 +33,3 @@ export function shouldFoldForLanguage(settings: Settings, languageId: string): b
 
 	return settings.enabledFiles.map((s) => s.toLowerCase()).includes(id);
 }
-
-// export function linesToFoldExcludingTarget(
-// 	ranges: FoldingRangeLite[] | undefined,
-// 	targetLine: number | undefined
-// ): number[] {
-// 	if (!ranges || ranges.length === 0) return [];
-
-// 	const isRegion = (r: FoldingRangeLite): boolean =>
-// 		!r.kind || r.kind.toString().toLowerCase().includes('region');
-// 	const regionRanges = ranges.filter(isRegion);
-// 	if (targetLine === undefined || targetLine === 0) return regionRanges.map((r) => r.start);
-
-// 	return regionRanges
-// 		.filter((r) => !(targetLine >= r.start && targetLine <= r.end))
-// 		.map((r) => r.start);
-// }

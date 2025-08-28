@@ -1,9 +1,18 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
+import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { OpenDocumentTracker, shouldFoldForLanguage } from './core';
-import { getSettings } from './settings';
-import { FoldingRange, FoldingRangeKind } from './types';
+import { OpenDocumentTracker, shouldFoldForLanguage } from './core.js';
+import { getSettings } from './settings.js';
+import { FoldingRange, FoldingRangeKind } from './types.js';
+
+let output: vscode.OutputChannel | undefined;
+
+const ts = (): string => new Date().toISOString();
+const log = (message: string): void => {
+	if (!output) return;
+	output.appendLine(`${ts()} ${message}`);
+};
 
 // eslint-disable-next-line @typescript-eslint/require-await
 async function maybeAutoFold(
@@ -20,8 +29,21 @@ async function maybeAutoFold(
 	const isNewlyOpened = tracker.markOpened(doc.uri);
 	if (!isNewlyOpened) return;
 
+	// Start a new section in the output for this file
+	if (output) {
+		const fileLabel = doc.isUntitled ? 'Untitled' : path.basename(doc.fileName);
+		output.appendLine(`\n--- ${fileLabel} (${doc.languageId || 'unknown'}) ---`);
+	}
+	log(`File opened: ${doc.uri.toString(true)}`);
+	log(`Lines of code: ${String(doc.lineCount)}`);
+
 	const settings = getSettings();
-	if (!shouldFoldForLanguage(settings, doc.languageId)) return;
+	if (!shouldFoldForLanguage(settings, doc.languageId)) {
+		log(
+			`Skipping auto-fold: language '${doc.languageId}' disabled by settings (enableForAllFiles=${String(settings.enableForAllFiles)})`
+		);
+		return;
+	}
 
 	// Defer folding a bit to allow Search/Go To to set the selection.
 	let finished = false;
@@ -44,18 +66,28 @@ async function maybeAutoFold(
 		try {
 			// Determine the effective target line from selection if not provided
 			const line = typeof targetLine === 'number' ? targetLine : active.selection.active.line;
+			const character = active.selection.active.character;
+			log(
+				`Cursor position read: line ${String(line + 1)}, character ${String(character + 1)}`
+			);
 			// Ask for folding ranges and decide if caret is inside any region
 			let ranges: FoldingRange[] = await vscode.commands.executeCommand(
 				'vscode.executeFoldingRangeProvider',
 				active.document.uri
 			);
 			ranges = ranges.filter((r) => r.kind === FoldingRangeKind.Region);
+			log(`Number of regions read: ${String(ranges.length)}`);
 
 			// There are no regions that need to be folded so we do nothing
-			if (ranges.length === 0) return;
+			if (ranges.length === 0) {
+				log('No marker regions found. No folding performed.');
+				return;
+			}
 
 			// Check if the line number is not valid or is less than or equal to 0. Fold all marker regions if so
 			if (typeof line !== 'number' || line <= 0) {
+				log('Action: close all regions (no valid caret line)');
+				log(`Intended to close ${String(ranges.length)} regions; kept open 0`);
 				await vscode.commands.executeCommand('editor.foldAllMarkerRegions');
 				return;
 			}
@@ -66,6 +98,15 @@ async function maybeAutoFold(
 				const lines = ranges
 					.filter((r) => !(line >= r.start && line <= r.end))
 					.map((r) => r.start + 1);
+
+				const kept = ranges.find((r) => line >= r.start && line <= r.end);
+				log('Action: close other regions; keep caret region open');
+				if (kept)
+					log(
+						`Keeping 1 region open because caret is inside it (start=${String(kept.start + 1)}, end=${String(kept.end + 1)})`
+					);
+				else log('Keeping 1 region open (caret region detection returned no match)');
+				log(`Intended to close ${String(lines.length)} regions; kept open 1`);
 
 				// eslint-disable-next-line @typescript-eslint/prefer-for-of
 				for (let i = 0; i < lines.length; i++) {
@@ -80,9 +121,11 @@ async function maybeAutoFold(
 			}
 
 			// Not inside a region: fold all marker regions
+			log('Action: close all regions (caret not inside any region)');
+			log(`Intended to close ${String(ranges.length)} regions; kept open 0`);
 			await vscode.commands.executeCommand('editor.foldAllMarkerRegions');
 		} catch (err) {
-			console.debug('better-regions: folding skipped due to error', err);
+			log(`Error while folding: ${String(err)}`);
 		} finally {
 			finished = true;
 		}
@@ -94,7 +137,11 @@ async function maybeAutoFold(
 
 		if (e.textEditor.document.uri.toString() !== uriKey) return;
 
-		const line = e.selections[0]?.active?.line ?? 0;
+		const pos = e.selections[0].active;
+		log(
+			`Selection changed: line ${String(pos.line + 1)}, character ${String(pos.character + 1)}`
+		);
+		const line = pos.line;
 		cleanup(selectionListener, timeout);
 		void doFold(line);
 	});
@@ -113,6 +160,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	const existingDocs = vscode.workspace.textDocuments.map((d) => d.uri.toString());
 	const tracker = new OpenDocumentTracker(existingDocs);
 
+	// Create output channel for logging
+	output = vscode.window.createOutputChannel('Better Regions');
+	context.subscriptions.push(output);
+	log('Extension activated');
+
 	// Initial active editor
 	void maybeAutoFold(tracker, vscode.window.activeTextEditor);
 
@@ -123,11 +175,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	// When a document is fully closed, allow folding again next time it's opened
 	context.subscriptions.push(
-		vscode.workspace.onDidCloseTextDocument((doc) => tracker.markClosed(doc.uri))
+		vscode.workspace.onDidCloseTextDocument((doc) => {
+			tracker.markClosed(doc.uri);
+			log(`File closed: ${doc.uri.toString(true)}`);
+		})
 	);
 }
 
 // This method is called when your extension is deactivated
 export function deactivate(): void {
-	console.log('Deactivate');
+	log('Extension deactivated');
 }

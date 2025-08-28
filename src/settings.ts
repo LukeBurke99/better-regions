@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Settings } from './types';
+import { Settings } from './types.js';
 
 /**
  * Read the settings for this extension and set default values
