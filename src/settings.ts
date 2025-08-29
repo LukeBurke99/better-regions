@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { parseSettings } from './core.js';
 import { Settings } from './types.js';
 
 /**
@@ -6,9 +7,5 @@ import { Settings } from './types.js';
  */
 export function getSettings(): Settings {
 	const cfg = vscode.workspace.getConfiguration('betterRegions');
-	return {
-		enableForAllFiles: cfg.get<boolean>('enableForAllFiles', true),
-		enabledFiles: cfg.get<string[]>('enabledFiles', []),
-		disabledFiles: cfg.get<string[]>('disabledFiles', [])
-	};
+	return parseSettings(cfg);
 }
