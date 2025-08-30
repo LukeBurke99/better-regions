@@ -14,6 +14,15 @@ const log = (message: string): void => {
 	output.appendLine(`${ts()} ${message}`);
 };
 
+// Get the file URI from a tab if it’s a real file-backed text tab
+function getFileUriFromTab(tab: vscode.Tab): vscode.Uri | undefined {
+	const input = tab.input;
+	if (input instanceof vscode.TabInputText)
+		return input.uri.scheme === 'file' ? input.uri : undefined;
+
+	return undefined;
+}
+
 // eslint-disable-next-line @typescript-eslint/require-await
 async function maybeAutoFold(
 	tracker: OpenDocumentTracker,
@@ -23,18 +32,19 @@ async function maybeAutoFold(
 
 	const doc = editor.document;
 	// Skip non-file backed docs except untitled
-	if (!doc.isUntitled && doc.uri.scheme !== 'file') return;
+	if (doc.isUntitled || doc.uri.scheme !== 'file') return;
 
 	// Only run on first time a doc becomes active after being closed
-	const isNewlyOpened = tracker.markOpened(doc.uri);
+	const filePath = doc.uri.fsPath;
+	const isNewlyOpened = tracker.markOpened(filePath);
 	if (!isNewlyOpened) return;
 
 	// Start a new section in the output for this file
 	if (output) {
-		const fileLabel = doc.isUntitled ? 'Untitled' : path.basename(doc.fileName);
+		const fileLabel = path.basename(doc.fileName);
 		output.appendLine(`\n--- ${fileLabel} (${doc.languageId || 'unknown'}) ---`);
 	}
-	log(`File opened: ${doc.uri.toString(true)}`);
+	log(`File opened: ${filePath}`);
 	log(`Lines of code: ${String(doc.lineCount)}`);
 
 	const settings = getSettings();
@@ -47,7 +57,6 @@ async function maybeAutoFold(
 
 	// Defer folding a bit to allow Search/Go To to set the selection.
 	let finished = false;
-	const uriKey = doc.uri.toString();
 
 	const cleanup = (listener?: vscode.Disposable, timer?: NodeJS.Timeout): void => {
 		if (listener) listener.dispose();
@@ -59,7 +68,7 @@ async function maybeAutoFold(
 		if (finished) return;
 
 		const active = vscode.window.activeTextEditor;
-		if (!active || active.document.uri.toString() !== uriKey) {
+		if (!active || active.document.uri.fsPath !== filePath) {
 			finished = true;
 			return;
 		}
@@ -135,7 +144,7 @@ async function maybeAutoFold(
 	const selectionListener = vscode.window.onDidChangeTextEditorSelection((e) => {
 		if (finished) return;
 
-		if (e.textEditor.document.uri.toString() !== uriKey) return;
+		if (e.textEditor.document.uri.fsPath !== filePath) return;
 
 		const pos = e.selections[0].active;
 		log(
@@ -157,7 +166,7 @@ async function maybeAutoFold(
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext): void {
 	// Track which documents are currently open so we only auto-fold on first open
-	const existingDocs = vscode.workspace.textDocuments.map((d) => d.uri.toString());
+	const existingDocs = vscode.workspace.textDocuments.map((d) => d.uri.fsPath);
 	const tracker = new OpenDocumentTracker(existingDocs);
 
 	// Create output channel for logging
@@ -173,11 +182,37 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.window.onDidChangeActiveTextEditor((e) => void maybeAutoFold(tracker, e))
 	);
 
+	// Mark closed when a file tab actually closes (primary signal)
+	context.subscriptions.push(
+		vscode.window.tabGroups.onDidChangeTabs((e) => {
+			for (const tab of e.closed) {
+				const uri = getFileUriFromTab(tab);
+				if (!uri) continue;
+
+				// Only mark closed if no other tab still has this resource open
+				const key = uri.fsPath;
+				const stillOpenSomewhere = vscode.window.tabGroups.all.some((g) =>
+					g.tabs.some((t) => {
+						const u = getFileUriFromTab(t);
+						return u ? u.fsPath === key : false;
+					})
+				);
+				if (!stillOpenSomewhere) {
+					tracker.markClosed(key);
+					log(`File closed (tab): ${uri.fsPath}`);
+				}
+			}
+		})
+	);
+
 	// When a document is fully closed, allow folding again next time it's opened
 	context.subscriptions.push(
 		vscode.workspace.onDidCloseTextDocument((doc) => {
-			tracker.markClosed(doc.uri);
-			log(`File closed: ${doc.uri.toString(true)}`);
+			if (doc.isUntitled || doc.uri.scheme !== 'file') return;
+			const filePath = doc.uri.fsPath;
+
+			tracker.markClosed(filePath);
+			log(`File closed: ${filePath}`);
 		})
 	);
 }

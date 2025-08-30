@@ -5,8 +5,8 @@ import { FoldingRange, FoldingRangeKind, Settings } from '../types';
 describe('Better Regions - Unit Tests', () => {
 	it('OpenDocumentTracker opens/closes correctly', () => {
 		const tracker = new OpenDocumentTracker();
-		const a = { toString: () => 'file:///test/a.ts' } as any;
-		const b = { toString: () => 'file:///test/b.ts' } as any;
+		const a = 'file:///test/a.ts';
+		const b = 'file:///test/b.ts';
 
 		// First open returns true
 		assert.strictEqual(tracker.markOpened(a), true);

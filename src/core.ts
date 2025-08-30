@@ -2,6 +2,13 @@
 
 import { Settings } from './types.js';
 
+const IGNORED_FILES = [
+	'chat-editing-text-model:',
+	'vscode-chat-code-block:',
+	'chat-editing-snapshot-text-model:',
+	'output:'
+];
+
 /**
  * Tracks open documents by their URIs.
  */
@@ -9,23 +16,29 @@ export class OpenDocumentTracker {
 	private open: Set<string> = new Set<string>();
 
 	public constructor(initialUris: readonly string[] = []) {
-		initialUris.forEach((u) => this.open.add(u));
+		initialUris.forEach((u) => {
+			if (!this.#checkIgnored(u)) this.open.add(u);
+		});
 	}
 
-	public isOpen(uri: { toString(): string }): boolean {
-		return this.open.has(uri.toString());
+	public isOpen(uri: string): boolean {
+		return this.open.has(uri);
 	}
 
-	public markOpened(uri: { toString(): string }): boolean {
-		const key = uri.toString();
+	public markOpened(key: string): boolean {
+		if (this.#checkIgnored(key)) return false; // don't add the ignored files to the tracker
 		if (this.open.has(key)) return false; // already open
 
 		this.open.add(key);
 		return true; // newly opened
 	}
 
-	public markClosed(uri: { toString(): string }): void {
-		this.open.delete(uri.toString());
+	public markClosed(key: string): void {
+		this.open.delete(key);
+	}
+
+	#checkIgnored(key: string): boolean {
+		return IGNORED_FILES.some((ignored) => key.startsWith(ignored));
 	}
 }
 
